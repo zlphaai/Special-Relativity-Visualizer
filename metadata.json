@@ -1,0 +1,5 @@
+{
+  "name": "Special Relativity Visualizer",
+  "description": "An interactive visualization of Special Relativity concepts including Time Dilation, Length Contraction, and Mass Increase using React and Tailwind CSS.",
+  "requestFramePermissions": []
+}

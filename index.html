@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>狭义相对论可视化 | Special Relativity Visualizer</title>
+    <meta name="description" content="Interactive visualization of Time Dilation, Length Contraction, and Relativistic Mass.">
+    
+    <!-- Tailwind CSS (Via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              space: {
+                900: '#0B0D17',
+                800: '#151932',
+                700: '#232946',
+              },
+              neon: {
+                blue: '#00f3ff',
+                pink: '#bc13fe',
+                purple: '#8a2be2',
+              }
+            },
+            animation: {
+              'spin-slow': 'spin 3s linear infinite',
+              'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
+          }
+        }
+      }
+    </script>
+    
+    <!-- React & ReactDOM (JSDelivr - Stable & Fast) -->
+    <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (For JSX) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+    <style>
+      body {
+        background-color: #0B0D17;
+        color: white;
+        overflow-x: hidden;
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #151932;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #232946;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #00f3ff;
+      }
+      input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: #00f3ff;
+        cursor: pointer;
+        margin-top: -6px;
+        box-shadow: 0 0 10px #00f3ff;
+      }
+      input[type=range]::-moz-range-thumb {
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: #00f3ff;
+        cursor: pointer;
+        box-shadow: 0 0 10px #00f3ff;
+      }
+      #root:empty::before {
+        content: 'Loading visualization...';
+        display: block;
+        text-align: center;
+        padding-top: 20vh;
+        color: #00f3ff;
+        font-family: monospace;
+      }
+    </style>
+</head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      // Ensure React is available
+      if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+        document.getElementById('root').innerHTML = '<div style="color:red; text-align:center; margin-top:50px;">Error: React failed to load. Please check your internet connection.</div>';
+        throw new Error("React not loaded");
+      }
+
+      const { useState, useEffect, useMemo, useRef } = React;
+
+      // --- Icons (Inline SVGs) ---
+      const ClockIcon = ({ size = 24, color = "currentColor" }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      );
+      const RulerIcon = ({ size = 24, color = "currentColor" }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0l12.6 12.6z"/><line x1="14.5" y1="3.2" x2="18.3" y2="7"/><line x1="11.5" y1="6.2" x2="15.3" y2="10"/><line x1="8.5" y1="9.2" x2="12.3" y2="13"/><line x1="5.5" y1="12.2" x2="9.3" y2="16"/><line x1="2.5" y1="15.2" x2="6.3" y2="19"/></svg>
+      );
+      const ScaleIcon = ({ size = 24, color = "currentColor" }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+      );
+      const ZapIcon = ({ size = 24, color = "currentColor" }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      );
+
+      // --- Components ---
+      
+      const Stars = ({ velocity }) => {
+        const stars = useMemo(() => {
+          return Array.from({ length: 100 }).map((_, i) => ({
+            id: i,
+            top: `${Math.random() * 100}%`,
+            left: `${Math.random() * 100}%`,
+            size: Math.random() * 2 + 1,
+            opacity: Math.random() * 0.5 + 0.5,
+          }));
+        }, []);
+
+        const duration = velocity === 0 ? 100 : Math.max(0.1, 2 * (1 - velocity));
+
+        return (
+          <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            {stars.map((star) => (
+              <div
+                key={star.id}
+                className="absolute bg-white rounded-full"
+                style={{
+                  top: star.top,
+                  left: star.left,
+                  width: `${star.size}px`,
+                  height: `${star.size}px`,
+                  opacity: star.opacity,
+                  animation: velocity > 0 ? `moveLeft ${duration}s linear infinite` : 'none',
+                  transform: velocity > 0.8 ? `scaleX(${1 + velocity * 10})` : 'scaleX(1)',
+                }}
+              />
+            ))}
+            <style>{`
+              @keyframes moveLeft {
+                from { transform: translateX(100vw) scaleX(${1 + velocity * 20}); }
+                to { transform: translateX(-10vw) scaleX(${1 + velocity * 20}); }
+              }
+            `}</style>
+          </div>
+        );
+      };
+
+      const FormulaCard = ({ title, icon, formula, value, description, color, hoverClass }) => {
+        return (
+          <div className={`bg-space-800 border border-space-700 rounded-xl p-4 flex flex-col gap-2 ${hoverClass} transition-colors shadow-lg`}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 rounded-lg bg-opacity-20" style={{ backgroundColor: `${color}20`, color: color }}>
+                {icon}
+              </div>
+              <h3 className="font-bold text-lg text-gray-100">{title}</h3>
+            </div>
+            
+            <div className="bg-space-900 rounded p-3 text-center font-mono text-sm md:text-base border border-space-700 text-gray-200">
+              {formula}
+            </div>
+
+            <div className="flex justify-between items-center mt-2">
+              <span className="text-gray-400 text-sm">当前值:</span>
+              <span className="font-mono font-bold text-xl" style={{ color: color }}>{value}</span>
+            </div>
+            
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+              {description}
+            </p>
+          </div>
+        );
+      };
+
+      const Spaceship = ({ velocity, gamma }) => {
+        // Length contraction factor: L = L0 / gamma
+        const contractionScale = 1 / gamma;
+        const animationDuration = 2 * gamma;
+
+        return (
+          <div className="relative flex flex-col items-center justify-center h-full w-full">
+            {/* Grid Lines */}
+            <div className="absolute inset-0 w-full h-full" 
+                 style={{ 
+                   backgroundImage: 'linear-gradient(to right, #232946 1px, transparent 1px)', 
+                   backgroundSize: '100px 100%' 
+                 }}>
+            </div>
+
+            {/* Spaceship Container */}
+            <div 
+              className="relative z-10 transition-transform duration-100 ease-out"
+              style={{
+                transform: `scaleX(${contractionScale})`,
+                width: '300px',
+                height: '120px',
+                animation: velocity > 0 ? 'vibrate 0.2s infinite' : 'none'
+              }}
+            >
+              {/* Main Body */}
+              <div className="absolute inset-0 bg-gray-200 rounded-r-full rounded-l-lg shadow-[0_0_30px_rgba(0,243,255,0.3)] border-2 border-gray-400 overflow-hidden flex items-center">
+                
+                {/* Cockpit */}
+                <div className="absolute right-12 top-1/4 w-16 h-1/2 bg-neon-blue bg-opacity-40 rounded-full border border-neon-blue backdrop-blur-sm z-20"></div>
+                
+                {/* Hull Details */}
+                <div className="w-full h-full bg-gradient-to-r from-gray-700 via-gray-300 to-gray-200 opacity-90"></div>
+                <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-400"></div>
+                <div className="absolute top-1/3 left-10 w-1/2 h-1 bg-gray-400 opacity-50"></div>
+                <div className="absolute bottom-1/3 left-10 w-1/2 h-1 bg-gray-400 opacity-50"></div>
+
+                {/* Onboard Clock */}
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 w-16 h-16 bg-space-900 rounded-full border-2 border-neon-pink flex items-center justify-center z-30"
+                     style={{ transform: 'translateY(-50%)' }}
+                     >
+                   <div className="relative w-full h-full rounded-full">
+                      <div className="absolute top-1 left-1/2 -translate-x-1/2 w-0.5 h-1 bg-gray-500"></div>
+                      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-0.5 h-1 bg-gray-500"></div>
+                      <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-0.5 bg-gray-500"></div>
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 w-1 h-0.5 bg-gray-500"></div>
+                      
+                      {/* Hand */}
+                      <div 
+                        className="absolute top-1/2 left-1/2 w-[40%] h-0.5 bg-neon-pink origin-left"
+                        style={{
+                          animation: `spinClock ${animationDuration}s linear infinite`
+                        }}
+                      ></div>
+                   </div>
+                </div>
+              </div>
+
+              {/* Engine Glow */}
+              <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-16 bg-neon-blue blur-lg opacity-80 animate-pulse"></div>
+              <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-12 h-24 bg-blue-500 blur-xl opacity-40"></div>
+
+              {/* Engine Thruster */}
+              <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-16 bg-gray-800 rounded-l-lg border-l-2 border-gray-600"></div>
+            </div>
+
+            <style>{`
+              @keyframes spinClock {
+                from { transform: translate(-50%, -50%) rotate(0deg); }
+                to { transform: translate(-50%, -50%) rotate(360deg); }
+              }
+              @keyframes vibrate {
+                0% { transform: scaleX(${contractionScale}) translateY(0px); }
+                25% { transform: scaleX(${contractionScale}) translateY(1px); }
+                50% { transform: scaleX(${contractionScale}) translateY(0px); }
+                75% { transform: scaleX(${contractionScale}) translateY(-1px); }
+                100% { transform: scaleX(${contractionScale}) translateY(0px); }
+              }
+            `}</style>
+
+            <div className="absolute bottom-4 text-center pointer-events-none w-full">
+              <p className="text-gray-400 text-sm mb-1">地球观察者视角</p>
+              <div className="flex justify-center gap-4 text-xs font-mono">
+                <div className="text-neon-pink">
+                  飞船时钟周期: {animationDuration.toFixed(2)}s
+                </div>
+                <div className="text-neon-blue">
+                  飞船长度: {(100 / gamma).toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const GammaChart = ({ currentVelocity, currentGamma }) => {
+        // Dimensions
+        const width = 100; // viewBox units
+        const height = 60; // viewBox units
+        const padding = { left: 10, right: 5, top: 5, bottom: 10 };
+        const graphWidth = width - padding.left - padding.right;
+        const graphHeight = height - padding.top - padding.bottom;
+        
+        // Data scales
+        const maxV = 1.0;
+        const maxGamma = 7;
+        
+        const getX = (v) => padding.left + (v / maxV) * graphWidth;
+        const getY = (g) => {
+          const clampedG = Math.min(g, maxGamma);
+          return height - padding.bottom - ((clampedG - 1) / (maxGamma - 1)) * graphHeight;
+        };
+        
+        // Generate path
+        const pathData = useMemo(() => {
+          let d = "";
+          for (let v = 0; v < 0.99; v += 0.01) {
+            const g = 1 / Math.sqrt(1 - v * v);
+            const x = getX(v);
+            const y = getY(g);
+            if (v === 0) d += `M ${x} ${y}`;
+            else d += ` L ${x} ${y}`;
+          }
+          return d;
+        }, []);
+        
+        const currentX = getX(currentVelocity);
+        const currentY = getY(currentGamma);
+        
+        return (
+          <div className="w-full h-48 md:h-full min-h-[200px] bg-space-800 rounded-xl p-4 border border-space-700 flex flex-col">
+            <h3 className="text-gray-300 text-sm font-bold mb-2 text-center">洛伦兹因子 (&gamma;) vs 速度 (v/c)</h3>
+            <div className="flex-grow w-full h-full relative">
+               <svg className="w-full h-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+                 
+                 {/* Grid Lines */}
+                 {[1, 3, 5, 7].map(g => (
+                   <line key={g} x1={padding.left} y1={getY(g)} x2={width-padding.right} y2={getY(g)} stroke="#232946" strokeWidth="0.5" />
+                 ))}
+                 {[0, 0.25, 0.5, 0.75, 1.0].map(v => (
+                    <line key={v} x1={getX(v)} y1={padding.top} x2={getX(v)} y2={height-padding.bottom} stroke="#232946" strokeWidth="0.5" />
+                 ))}
+                 
+                 {/* Axes */}
+                 <line x1={padding.left} y1={height-padding.bottom} x2={width-padding.right} y2={height-padding.bottom} stroke="#6b7280" strokeWidth="0.5" />
+                 <line x1={padding.left} y1={padding.top} x2={padding.left} y2={height-padding.bottom} stroke="#6b7280" strokeWidth="0.5" />
+                 
+                 {/* Labels (Y Axis) */}
+                 {[1, 3, 5, 7].map(g => (
+                   <text key={g} x={padding.left - 2} y={getY(g) + 1.5} textAnchor="end" fill="#6b7280" fontSize="3">{g}</text>
+                 ))}
+                 
+                 {/* Labels (X Axis) */}
+                 {[0, 0.5, 1.0].map(v => (
+                   <text key={v} x={getX(v)} y={height - padding.bottom + 4} textAnchor="middle" fill="#6b7280" fontSize="3">{v}</text>
+                 ))}
+                 
+                 {/* Axis Titles */}
+                 <text x={width/2} y={height-1} textAnchor="middle" fill="#6b7280" fontSize="3">v / c</text>
+                 <text x={2} y={height/2} textAnchor="middle" fill="#6b7280" fontSize="3" transform={`rotate(-90, 2, ${height/2})`}>&gamma;</text>
+
+                 {/* The Curve */}
+                 <path d={pathData} fill="none" stroke="#8a2be2" strokeWidth="1" />
+                 
+                 {/* Current Value Indicator */}
+                 <line x1={currentX} y1={padding.top} x2={currentX} y2={height-padding.bottom} stroke="#00f3ff" strokeWidth="0.5" strokeDasharray="1 1" />
+                 <line x1={padding.left} y1={currentY} x2={currentX} y2={currentY} stroke="#00f3ff" strokeWidth="0.5" strokeDasharray="1 1" />
+                 <circle cx={currentX} cy={currentY} r="1.5" fill="#00f3ff" />
+                 
+               </svg>
+            </div>
+          </div>
+        );
+      };
+
+      const App = () => {
+        const [velocity, setVelocity] = useState(0);
+        const [gamma, setGamma] = useState(1);
+
+        useEffect(() => {
+          // Cap at 0.995 to prevent infinity issues
+          const v = Math.min(velocity, 0.995);
+          const g = 1 / Math.sqrt(1 - v * v);
+          setGamma(g);
+        }, [velocity]);
+
+        const handleSliderChange = (e) => {
+          setVelocity(parseFloat(e.target.value));
+        };
+
+        return (
+          <div className="min-h-screen bg-space-900 text-white font-sans selection:bg-neon-pink selection:text-white flex flex-col">
+            <header className="bg-space-800 border-b border-space-700 p-4 sticky top-0 z-50 backdrop-blur-md bg-opacity-80">
+              <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-neon-purple rounded-lg shadow-[0_0_15px_rgba(138,43,226,0.5)]">
+                    <ZapIcon size={24} color="white" />
+                  </div>
+                  <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-neon-blue to-neon-purple">
+                    狭义相对论实验室
+                  </h1>
+                </div>
+                
+                <div className="flex items-center gap-4 w-full md:w-auto bg-space-900 p-3 rounded-lg border border-space-700">
+                  <span className="text-sm font-mono text-neon-blue whitespace-nowrap">速度 (v)</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="0.995"
+                    step="0.001"
+                    value={velocity}
+                    onChange={handleSliderChange}
+                    className="w-full md:w-64 h-2 bg-space-700 rounded-lg appearance-none cursor-pointer accent-neon-blue hover:accent-neon-pink transition-all outline-none"
+                  />
+                  <span className="text-sm font-mono w-16 text-right text-white">
+                    {(velocity * 100).toFixed(1)}% c
+                  </span>
+                </div>
+              </div>
+            </header>
+
+            <main className="flex-grow flex flex-col lg:flex-row max-w-7xl mx-auto w-full p-4 gap-6">
+              <div className="lg:w-2/3 flex flex-col gap-6">
+                <div className="relative h-[300px] md:h-[400px] bg-black rounded-2xl border-2 border-space-700 overflow-hidden shadow-2xl group">
+                  <Stars velocity={velocity} />
+                  <Spaceship velocity={velocity} gamma={gamma} />
+                  <div className="absolute top-4 right-4 bg-space-900 bg-opacity-80 backdrop-blur px-4 py-2 rounded-lg border border-space-700 text-right z-20">
+                    <div className="text-xs text-gray-400">洛伦兹因子 (&gamma;)</div>
+                    <div className="text-2xl font-mono font-bold text-neon-pink">{gamma.toFixed(3)}</div>
+                  </div>
+                </div>
+
+                <div className="h-[250px]">
+                   <GammaChart currentVelocity={velocity} currentGamma={gamma} />
+                </div>
+              </div>
+
+              <div className="lg:w-1/3 flex flex-col gap-4">
+                <FormulaCard 
+                  title="时间膨胀 (Time Dilation)"
+                  icon={<ClockIcon size={20} />}
+                  color="#bc13fe"
+                  hoverClass="hover:border-neon-pink"
+                  formula={<span>&Delta;t' = &gamma; &Delta;t<sub>0</sub></span>}
+                  value={`${gamma.toFixed(2)}x 变慢`}
+                  description="对地球观察者来说，飞船上的时间过得更慢。飞船上的1秒等于地球上的 γ 秒。"
+                />
+
+                <FormulaCard 
+                  title="长度收缩 (Length Contraction)"
+                  icon={<RulerIcon size={20} />}
+                  color="#00f3ff"
+                  hoverClass="hover:border-neon-blue"
+                  formula={<span>L' = L<sub>0</sub> / &gamma;</span>}
+                  value={`${(100/gamma).toFixed(1)}% 原长`}
+                  description="沿着运动方向，物体看起来变短了。飞船速度越快，地球观察者看到的飞船越扁。"
+                />
+
+                <FormulaCard 
+                  title="相对论质量 (Relativistic Mass)"
+                  icon={<ScaleIcon size={20} />}
+                  color="#8a2be2"
+                  hoverClass="hover:border-neon-purple"
+                  formula={<span>m = &gamma; m<sub>0</sub></span>}
+                  value={`${gamma.toFixed(2)}x 增重`}
+                  description="物体的质量随着速度增加而增加。当 v 接近光速时，质量趋于无穷大，因此无法达到光速。"
+                />
+                
+                <div className="bg-space-800 p-4 rounded-xl border border-space-700 text-xs text-gray-400">
+                  <h4 className="font-bold text-gray-200 mb-2">关于本模拟</h4>
+                  <p>
+                    这是一个基于爱因斯坦狭义相对论的理想化模拟。假设光速 c = 1。
+                    为了视觉效果，即使是低速状态下星星也会缓慢移动，但在高洛伦兹因子下，长度收缩和时间差异是严格按照数学公式计算的。
+                  </p>
+                </div>
+              </div>
+            </main>
+          </div>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
